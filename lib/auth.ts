@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { compare } from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db) as any,
+  adapter: PrismaAdapter(db),
   session: {
     strategy: "jwt",
   },
@@ -26,6 +26,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await db.user.findUnique({
           where: { email: credentials.email },
+          include: { memberships: true }
         });
 
         if (!user || !user.password) {
@@ -43,6 +44,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.image,
+          role: user.memberships[0]?.role || "USER",
         };
       }
     })
@@ -51,12 +53,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.role = (user as any).role;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
+        (session.user as any).role = token.role;
       }
       return session;
     }

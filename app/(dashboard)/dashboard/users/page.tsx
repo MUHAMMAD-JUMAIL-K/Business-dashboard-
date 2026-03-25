@@ -1,18 +1,27 @@
 "use client";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Edit2, Trash2, MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
 
-const initialUsers = [
+type UserType = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+};
+
+const initialUsers: UserType[] = [
   { id: 1, name: "Alice Johnson", email: "alice@example.com", role: "Admin", status: "Active" },
   { id: 2, name: "Bob Smith", email: "bob@example.com", role: "Manager", status: "Active" },
   { id: 3, name: "Charlie Davis", email: "charlie@example.com", role: "User", status: "Offline" },
@@ -20,10 +29,12 @@ const initialUsers = [
 ];
 
 export default function UsersPage() {
-  const [users, setUsers] = useState(initialUsers);
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === "ADMIN";
+  const [users, setUsers] = useState<UserType[]>(initialUsers);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<UserType | null>(null);
 
   const handleAddUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,7 +56,7 @@ export default function UsersPage() {
     toast.success("User added successfully!");
   };
 
-  const openEditDialog = (user: any) => {
+  const openEditDialog = (user: UserType) => {
     setEditingUser(user);
     setIsEditOpen(true);
   };
@@ -85,9 +96,9 @@ export default function UsersPage() {
         <h2 className="text-3xl font-bold tracking-tight">Manage Users</h2>
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button>+ Add New User</Button>
-          </DialogTrigger>
+          {isAdmin && (<DialogTrigger className={buttonVariants({ variant: "default" })}>
+            + Add New User
+          </DialogTrigger>)}
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Add Team Member</DialogTitle>
@@ -207,19 +218,20 @@ export default function UsersPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
+                    {isAdmin ? (
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                      <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", className: "h-8 w-8 p-0" })}>
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => openEditDialog(user)} className="cursor-pointer">
-                          <Edit2 className="mr-2 h-4 w-4 text-primary" />
-                          Edit Details
-                        </DropdownMenuItem>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => openEditDialog(user)} className="cursor-pointer">
+                            <Edit2 className="mr-2 h-4 w-4 text-primary" />
+                            Edit Details
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -227,6 +239,9 @@ export default function UsersPage() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic mr-2 border rounded-full px-2 py-1 bg-muted/50">Restricted</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

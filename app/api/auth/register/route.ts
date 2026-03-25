@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ message: "Account created successfully", data: result }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: error.issues[0].message }, { status: 400 });
     }

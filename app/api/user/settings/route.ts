@@ -10,11 +10,15 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, email } = await req.json();
+    const body = await req.json();
+    const dataToUpdate: any = {};
+    if (body.name !== undefined) dataToUpdate.name = body.name;
+    if (body.email !== undefined) dataToUpdate.email = body.email;
+    if (body.image !== undefined) dataToUpdate.image = body.image;
 
     const updated = await db.user.update({
       where: { id: session.user.id },
-      data: { name, email },
+      data: dataToUpdate,
     });
 
     return NextResponse.json({ message: "Settings updated successfully", user: updated });
