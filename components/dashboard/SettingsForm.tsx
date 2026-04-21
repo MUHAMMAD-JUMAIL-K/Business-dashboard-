@@ -97,7 +97,9 @@ export function SettingsForm({ user }: { user: any }) {
     const currentEmail = user?.email || "";
 
     if (user?.role !== "ADMIN" && (name !== currentName || email !== currentEmail)) {
-       const requests = JSON.parse(localStorage.getItem("nexuscore_approval_queue") || "[]");
+       const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+       const queueKey = `nexuscore_approval_queue_${activeOrgId}`;
+       const requests = JSON.parse(localStorage.getItem(queueKey) || "[]");
        requests.push({
            id: `REQ-${Date.now()}`,
            userId: user?.id || Date.now(),
@@ -108,7 +110,7 @@ export function SettingsForm({ user }: { user: any }) {
            timestamp: new Date().toISOString(),
            status: 'Pending'
        });
-       localStorage.setItem("nexuscore_approval_queue", JSON.stringify(requests));
+       localStorage.setItem(queueKey, JSON.stringify(requests));
        toast.success("Security Policy: Name/Email update request routed to Admin for approval.");
        
        if (avatarPreview && avatarPreview !== globalAvatar) {

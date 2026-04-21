@@ -47,13 +47,23 @@ export default function DashboardPage() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("nexuscore_orders");
-    if (saved) {
-      try {
-        setOrders(JSON.parse(saved));
-      } catch(e) {}
-    }
+    const loadData = () => {
+      const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+      const saved = localStorage.getItem(`nexuscore_orders_${activeOrgId}`);
+      if (saved) {
+        try {
+          setOrders(JSON.parse(saved));
+        } catch(e) {}
+      } else {
+        setOrders(activeOrgId === "org_1" ? recentOrders : []);
+      }
+    };
+
+    loadData();
     setIsHydrated(true);
+
+    window.addEventListener("nexuscore_org_switched", loadData);
+    return () => window.removeEventListener("nexuscore_org_switched", loadData);
   }, []);
 
   const totalRevenue = orders.reduce((sum, order) => {

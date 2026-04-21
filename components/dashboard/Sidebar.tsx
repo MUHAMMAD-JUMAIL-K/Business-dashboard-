@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 const navItems = [
@@ -32,6 +32,32 @@ export function Sidebar() {
   const [activeOrg, setActiveOrg] = useState(orgs[0]);
   const [isAddOpen, setIsAddOpen] = useState(false);
 
+  useEffect(() => {
+    const savedOrgs = localStorage.getItem("nexuscore_orgs");
+    let loadedOrgs = orgs;
+    if (savedOrgs) {
+      try { 
+        loadedOrgs = JSON.parse(savedOrgs); 
+        setOrgs(loadedOrgs); 
+      } catch(e) {}
+    }
+    
+    const savedActive = localStorage.getItem("nexuscore_active_org");
+    const active = loadedOrgs.find(o => o.id === savedActive) || loadedOrgs[0];
+    setActiveOrg(active);
+    
+    if (!savedActive) {
+      localStorage.setItem("nexuscore_active_org", active.id);
+    }
+  }, []);
+
+  const handleOrgSwitch = (org: typeof activeOrg) => {
+    setActiveOrg(org);
+    localStorage.setItem("nexuscore_active_org", org.id);
+    toast.success(`Switched workspace to ${org.name}`);
+    window.dispatchEvent(new Event("nexuscore_org_switched"));
+  };
+
   const handleCreateCompany = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -39,10 +65,12 @@ export function Sidebar() {
     if (!name || name.trim() === "") return;
     
     const newOrg = { id: `org_${Date.now()}`, name: name.trim(), plan: "Free" };
-    setOrgs([...orgs, newOrg]);
-    setActiveOrg(newOrg);
+    const updatedOrgs = [...orgs, newOrg];
+    setOrgs(updatedOrgs);
+    localStorage.setItem("nexuscore_orgs", JSON.stringify(updatedOrgs));
+    
+    handleOrgSwitch(newOrg);
     setIsAddOpen(false);
-    toast.success(`${newOrg.name} company workspace created & activated successfully!`);
   };
 
   return (
@@ -65,7 +93,7 @@ export function Sidebar() {
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Switch Workspace</DropdownMenuLabel>
               {orgs.map((org) => (
-                 <DropdownMenuItem key={org.id} onClick={() => { setActiveOrg(org); toast.success(`Switched workspace to ${org.name}`); }} className="cursor-pointer py-2 rounded-lg flex items-center justify-between group">
+                 <DropdownMenuItem key={org.id} onClick={() => handleOrgSwitch(org)} className="cursor-pointer py-2 rounded-lg flex items-center justify-between group">
                    <div className="flex items-center space-x-2 truncate">
                      <div className={`w-2 h-2 rounded-full ${activeOrg.id === org.id ? 'bg-primary' : 'bg-transparent group-hover:bg-muted-foreground/30'}`} />
                      <span className={`truncate font-medium ${activeOrg.id === org.id ? 'text-foreground' : 'text-muted-foreground'}`}>{org.name}</span>

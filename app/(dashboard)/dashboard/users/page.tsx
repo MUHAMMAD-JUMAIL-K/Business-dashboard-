@@ -47,10 +47,18 @@ export default function UsersPage() {
   const [requests, setRequests] = useState<any[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("nexuscore_approval_queue");
-    if (saved) {
-      setRequests(JSON.parse(saved).filter((r: any) => r.status === 'Pending'));
-    }
+    const loadQueue = () => {
+      const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+      const saved = localStorage.getItem(`nexuscore_approval_queue_${activeOrgId}`);
+      if (saved) {
+        setRequests(JSON.parse(saved).filter((r: any) => r.status === 'Pending'));
+      } else {
+        setRequests([]);
+      }
+    };
+    loadQueue();
+    window.addEventListener("nexuscore_org_switched", loadQueue);
+    return () => window.removeEventListener("nexuscore_org_switched", loadQueue);
   }, []);
 
   const exportCSV = () => {
@@ -67,9 +75,10 @@ export default function UsersPage() {
   };
 
   const handleRequest = (reqId: string, approved: boolean) => {
-     const allReqs = JSON.parse(localStorage.getItem("nexuscore_approval_queue") || "[]");
+     const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+     const allReqs = JSON.parse(localStorage.getItem(`nexuscore_approval_queue_${activeOrgId}`) || "[]");
      const updated = allReqs.map((r: any) => r.id === reqId ? { ...r, status: approved ? 'Approved' : 'Denied' } : r);
-     localStorage.setItem("nexuscore_approval_queue", JSON.stringify(updated));
+     localStorage.setItem(`nexuscore_approval_queue_${activeOrgId}`, JSON.stringify(updated));
      setRequests(updated.filter((r: any) => r.status === 'Pending'));
      
      if (approved) {

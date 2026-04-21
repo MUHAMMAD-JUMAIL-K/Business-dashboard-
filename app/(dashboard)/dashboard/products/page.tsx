@@ -45,18 +45,28 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState<any>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("nexuscore_products_v2");
-    if (saved) {
-      try {
-        setProducts(JSON.parse(saved));
-      } catch(e) {}
-    }
+    const loadData = () => {
+      const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+      const saved = localStorage.getItem(`nexuscore_products_v2_${activeOrgId}`);
+      if (saved) {
+        try {
+          setProducts(JSON.parse(saved));
+        } catch(e) {}
+      } else {
+        setProducts(activeOrgId === "org_1" ? initialProducts : []);
+      }
+    };
+    loadData();
     setIsHydrated(true);
+    
+    window.addEventListener("nexuscore_org_switched", loadData);
+    return () => window.removeEventListener("nexuscore_org_switched", loadData);
   }, []);
 
   useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("nexuscore_products_v2", JSON.stringify(products));
+      const activeOrgId = localStorage.getItem("nexuscore_active_org") || "org_1";
+      localStorage.setItem(`nexuscore_products_v2_${activeOrgId}`, JSON.stringify(products));
     }
   }, [products, isHydrated]);
 
