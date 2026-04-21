@@ -43,7 +43,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          image: user.image,
+          // Removed image to prevent massive Base64 JWT Cookie bloat -> HTTP 431 Error
           role: user.memberships[0]?.role || "USER",
         };
       }

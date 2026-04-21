@@ -10,14 +10,56 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Trash2, BellRing, Mail, ShieldAlert, CreditCard, Building2, Save } from "lucide-react";
+import { Camera, Trash2, BellRing, Mail, ShieldAlert, CreditCard, Building2, Save, Eye, EyeOff } from "lucide-react";
 
 export function SettingsForm({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.image || null);
+  const [globalAvatar, setGlobalAvatar] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  React.useEffect(() => {
+     const savedAvatar = localStorage.getItem("nexuscore_global_avatar");
+     setAvatarPreview(savedAvatar || user?.image || null);
+     setGlobalAvatar(savedAvatar);
+  }, [user]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [orgName, setOrgName] = useState("NexusCore Industries");
   const [marketingOn, setMarketingOn] = useState(true);
+
+  // Security States
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) return;
+    setPasswordLoading(true);
+    
+    try {
+      const res = await fetch("/api/user/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to update password");
+      }
+      
+      toast.success("Cryptographic signature successfully rotated!");
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to rotate credentials");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,21 +69,10 @@ export function SettingsForm({ user }: { user: any }) {
        return;
     }
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const base64 = event.target?.result as string;
       setAvatarPreview(base64);
-      toast.loading("Uploading photo to database...", { id: "upload" });
-      try {
-        const res = await fetch("/api/user/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64 }),
-        });
-        if (!res.ok) throw new Error("Upload failed");
-        toast.success("Profile photo securely persisted!", { id: "upload" });
-      } catch (err) {
-        toast.error("Failed to save photo to database.", { id: "upload" });
-      }
+      toast.info("Photo staged. Click 'Save Identity' to permanently upload.");
     };
     reader.readAsDataURL(file);
   };
@@ -62,15 +93,52 @@ export function SettingsForm({ user }: { user: any }) {
     const name = formData.get("name") as string;
     const email = formData.get("email") as string;
 
+    const currentName = user?.name || "";
+    const currentEmail = user?.email || "";
+
+    if (user?.role !== "ADMIN" && (name !== currentName || email !== currentEmail)) {
+       const requests = JSON.parse(localStorage.getItem("nexuscore_approval_queue") || "[]");
+       requests.push({
+           id: `REQ-${Date.now()}`,
+           userId: user?.id || Date.now(),
+           currentName,
+           currentEmail,
+           requestedName: name,
+           requestedEmail: email,
+           timestamp: new Date().toISOString(),
+           status: 'Pending'
+       });
+       localStorage.setItem("nexuscore_approval_queue", JSON.stringify(requests));
+       toast.success("Security Policy: Name/Email update request routed to Admin for approval.");
+       
+       if (avatarPreview && avatarPreview !== globalAvatar) {
+          localStorage.setItem("nexuscore_global_avatar", avatarPreview);
+          window.dispatchEvent(new Event("nexuscore_avatar_updated"));
+          toast.success("However, your new Identity Photo has been securely saved!");
+       }
+       setLoading(false);
+       return;
+    }
+
     try {
+      if (avatarPreview && avatarPreview !== globalAvatar) {
+         localStorage.setItem("nexuscore_global_avatar", avatarPreview);
+         window.dispatchEvent(new Event("nexuscore_avatar_updated"));
+      }
+
+      const payload: any = { name, email };
+      if (avatarPreview && avatarPreview !== user?.image) {
+        payload.image = avatarPreview;
+      }
+
       const res = await fetch("/api/user/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Failed to update profile");
-      toast.success("Profile updated successfully!");
+      toast.success("Identity and Photo permanently secured to the database!");
     } catch (error) {
       toast.error("Something went wrong");
     } finally {
@@ -129,8 +197,8 @@ export function SettingsForm({ user }: { user: any }) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email" className="font-medium">Email Address</Label>
-                    <Input id="email" name="email" type="email" defaultValue={user?.email || ""} placeholder="john@example.com" disabled={user?.role !== "ADMIN"} className="bg-background transition-shadow focus-visible:ring-primary/20 disabled:opacity-50" />
-                    {user?.role !== "ADMIN" && <p className="text-[11px] text-muted-foreground mt-1">Only administrators can alter highly privileged root emails.</p>}
+                    <Input id="email" name="email" type="email" defaultValue={user?.email || ""} placeholder="john@example.com" className="bg-background transition-shadow focus-visible:ring-primary/20" />
+                    {user?.role !== "ADMIN" && <p className="text-[11px] text-muted-foreground mt-1 text-amber-500 font-semibold">Changes to credentials will require explicit administrator approval.</p>}
                   </div>
                 </div>
               </CardContent>
@@ -186,7 +254,7 @@ export function SettingsForm({ user }: { user: any }) {
                   <p className="text-sm text-muted-foreground max-w-sm">You are currently leveraging unlimited scale capacities. Next billing cycle triggers on April 1st, 2026.</p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <p className="text-3xl font-black">$299<span className="text-base text-muted-foreground font-normal">/mo</span></p>
+                  <p className="text-3xl font-black">₹299<span className="text-base text-muted-foreground font-normal">/mo</span></p>
                   <Button variant="link" className="px-0 text-primary">View past invoices &rarr;</Button>
                 </div>
               </div>
@@ -201,17 +269,27 @@ export function SettingsForm({ user }: { user: any }) {
               <CardDescription className="text-base text-muted-foreground">Regulate standard and severe authorization workflows.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-              <div className="space-y-4 max-w-md">
+              <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
                 <div className="space-y-2">
                   <Label>Current Password Signature</Label>
-                  <Input type="password" placeholder="••••••••" />
+                  <div className="relative">
+                    <Input type={showCurrentPassword ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" required className="pr-10" />
+                    <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>New Cryptographic Signature</Label>
-                  <Input type="password" placeholder="••••••••" />
+                  <div className="relative">
+                    <Input type={showNewPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" minLength={6} required className="pr-10" />
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <Button onClick={() => toast.success("Signature updated via encryption node.")}>Rotate Credentials</Button>
-              </div>
+                <Button type="submit" disabled={passwordLoading} className="shadow-sm">{passwordLoading ? "Rotating..." : "Rotate Credentials"}</Button>
+              </form>
 
               {user?.role === "ADMIN" && (
                 <div className="mt-8 p-6 border-2 border-destructive/20 rounded-xl bg-destructive/5 shadow-sm">
